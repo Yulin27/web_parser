@@ -17,6 +17,14 @@ Before using this Python program, you need to install the required third-party l
 pip install -r requirements.txt
 ```
 
+
+
+You can use the following command to train the model:
+
+```shell
+python3 train_model.py
+```
+
 You can use the following command in the terminal to predict the main body of web pages:
 
 ```shell
@@ -24,15 +32,8 @@ python3 prediction.py -i <inputfile> -o <outputfile> -m <model>
 ```
 - *inputfile*: Input file path
 - *outputfile*: Output file path
-- *model*: Model type, values are zh/la (Chinese model/Latin model).
+- *model*: Model type
 
-*Loading the model each time you run it will take a long time. It is recommended to cache the model so that it can be used directly next time you run it, refer to exemple.ipynb*
-
-You can use the following command to train the model:
-
-```shell
-python3 train_model.py
-```
 
 &nbsp;
 &nbsp;
