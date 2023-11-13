@@ -1,0 +1,7 @@
+bs4
+selenium
+pandas
+numpy
+torch
+sklearn
+gensim
