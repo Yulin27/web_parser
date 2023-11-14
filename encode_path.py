@@ -20,19 +20,16 @@ def read_csv(file_name):
 
 
 
-# 定义函数进行特征提取
+# extract features from tag_path and content
 def extract_features(path, content):
-    # 提取标签
     tag = path[-1]
     
-    # 提取文本长度
-    # 各种语言的长度计算方式不同，这里只是简单的计算字符数
+    # extract text length and punctuation count
     text = ''.join(content)
     text_length = len(text)
-    # 提取包含的结束标点符号数
     punctuation_count = sum([1 for c in text if c in ['.', '!', '?', '。', '！', '？']])
     
-    # 提取classname信息
+    # extract class name
     classname = ''
     match = re.search(r'class="([^"]*)"', tag)
     if match:
@@ -41,11 +38,11 @@ def extract_features(path, content):
 
     return np.array([tag, classname, text_length, punctuation_count])
 
-# 定义函数进行特征编码
-# 优先在tag_vectors和class_name_vectors中查找编码，如果没有找到，再从模型中获取编码
+# extract features from tag_path and content for encoding
+# search for the encoding in tag_vectors and class_name_vectors first, if not found, get the encoding from the model
 def encode_feature(path, content, model_tag, model_class_name, tag_vectors, class_name_vectors):
     tag, classname, text_length, punctuation_count = extract_features(path, content)
-    # 生成标签编码
+    # generate tag encoding
 
     try:
         tag_encoding = tag_vectors.loc[tag]
@@ -53,7 +50,7 @@ def encode_feature(path, content, model_tag, model_class_name, tag_vectors, clas
     except:
         tag_encoding = model_tag.wv[tag]
 
-    # 生成类名编码
+    # generate class name encoding
     if classname == '':
         classname_encoding = class_name_vectors.loc['0']
         classname_encoding = classname_encoding.vector
@@ -65,17 +62,16 @@ def encode_feature(path, content, model_tag, model_class_name, tag_vectors, clas
             classname_encoding = model_class_name.wv[classname]
 
 
-    # 生成输出特征编码
+    # concatenate all features
     feature_vector = np.concatenate((tag_encoding, classname_encoding, np.array([float(text_length), float(punctuation_count)])))
     if len(feature_vector)<62:
         print("error")
     return feature_vector
 
-# 递归查找父节点的编码
-# index: 当前节点的索引
-# tag_path_list: dom树
-# encoding_list: 编码列表
-# 如果找到的父节点有内容，父节点的编码应该已经存储在encoding_list中，直接返回
+# search the encoding of the parent node by recursion
+# index: index of the current node
+# tag_path_list: dom tree
+# encoding_list: list of encoding of each node
 def searchParentEncode(index, tag_path_list, encoding_list, model_tag, model_class_name, tag_vectors, class_name_vectors):
     path = tag_path_list[index]
     if len(path) < 2:
@@ -83,7 +79,7 @@ def searchParentEncode(index, tag_path_list, encoding_list, model_tag, model_cla
     parentTag = path[-2].split()[0]
     parent_path = path[:-2]
     j = index-1
-    # 找到父节点
+    # found the parent node
     while j >= 0:
         tag = tag_path_list[j][-1].split()[0]
         if tag == parentTag and tag_path_list[j][:-1] == parent_path:
@@ -95,23 +91,22 @@ def searchParentEncode(index, tag_path_list, encoding_list, model_tag, model_cla
     else:
         return None
 
-# 递归编码路径并返回encoding_list
 def encode_path(index, content, model_tag, model_classname, tag_vectors, class_name_vectors, encoding_list, tag_path_list):
-    # 编码当前节点
+    # encode the current node
     encoding = encode_feature(tag_path_list[index], content, model_tag, model_classname, tag_vectors, class_name_vectors)
-    # 查找父节点的位置和编码
+    # search for the encoding of the parent node
     parent = searchParentEncode(index, tag_path_list, encoding_list, model_tag, model_classname, tag_vectors, class_name_vectors)
-    # html的根节点没有父节点，直接返回
+    # return the encoding if the current node is the root node
     if parent is None:
         encoding_list[index] = [encoding]
         return encoding_list
-    # 找到父节点，如果父节点有编码,将当前节点的编码加入到父节点的编码中,作为当前节点的编码路径
+    # found the parent node, if the parent node has encoding, append the encoding of the current node to the parent node's encoding
     elif not(parent[1] is None):
         encoding_parent = copy.copy(parent[1])
         encoding_parent.append(encoding)
         encoding_list[index] = encoding_parent
         return encoding_list
-    # 找到父节点，如果父节点没有编码，递归查找父节点的父节点
+    # if the parent node does not have encoding, search for the encoding of the parent node's parent node by recursion
     else:
         encoding_list = encode_path(parent[0], content, model_tag, model_classname, tag_vectors, class_name_vectors, encoding_list, tag_path_list)
         encoding_parent = copy.copy(encoding_list[parent[0]])
@@ -121,7 +116,7 @@ def encode_path(index, content, model_tag, model_classname, tag_vectors, class_n
 
 
 
-# 编码所有路径
+# encode the path of each node
 def encode_path_list(tag_path_list, content_list, index_non_empty_content, model_tag, model_classname, tag_vectors, class_name_vectors):
     encoding_list = [None] * len(tag_path_list)
     for index in index_non_empty_content:

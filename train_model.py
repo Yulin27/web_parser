@@ -28,23 +28,23 @@ model_classname = FastText.load(config.model_file_class_name)
 
 
 def get_data(html_file_path):
-    # 进行处理，将content内容写入txt文件
+    
     with open(html_file_path, "r", encoding="utf-8") as html_file:
         html_content = html_file.read()
 
         html_content = preprocess_html(html_content)
-        # 调用函数生成标签路径
+        # generate tag path
         paths = dom_tree(html_content)
-        # 调用函数生成对应内容表
+        # generate content list
         content_list = assign_content_to_tags(paths, html_content)
 
-        # 调用函数提取非空内容的索引
+        # extract non-empty content index
         non_empty_index = extract_nonempty_content_index(content_list)
         nonempty_content = [content_list[i] for i in non_empty_index]
 
         encoding_list = encode_path_list(paths, content_list, non_empty_index, model_tag, model_classname, tag_vectors, class_name_vectors)
         encoding_list = [encoding_list[i] for i in non_empty_index]
-        # 最大序列长度 15 长于15个的截断，短于15个的补0）
+        # padding and truncating
         for i in range(len(encoding_list)):
             if len(encoding_list[i]) > 15:
                 encoding_list[i] = encoding_list[i][:15]
@@ -55,26 +55,24 @@ def get_data(html_file_path):
         return data, nonempty_content
     
 def get_data_tag(html_file_path, text_df):
-    # 进行处理，将content内容写入txt文件
+
     with open(html_file_path, "r", encoding="utf-8") as html_file:
         html_content = html_file.read()
         file_name = html_file_path.split('/')[-1]
         file_name_pur = os.path.splitext(file_name)[0]
 
         html_content = preprocess_html(html_content)
-        # 调用函数生成标签路径
+        
         paths = dom_tree(html_content)
-        # 调用函数生成对应内容表
         content_list = assign_content_to_tags(paths, html_content)
 
-        # 调用函数提取非空内容的索引
         non_empty_index = extract_nonempty_content_index(content_list)
         nonempty_content = [content_list[i] for i in non_empty_index]
 
 
         encoding_list = encode_path_list(paths, content_list, non_empty_index, model_tag, model_classname, tag_vectors, class_name_vectors)
         encoding_list = [encoding_list[i] for i in non_empty_index]
-        # 最大序列长度 15 长于15个的截断，短于15个的补0）
+
         for i in range(len(encoding_list)):
             if len(encoding_list[i]) > 15:
                 encoding_list[i] = encoding_list[i][:15]
@@ -87,20 +85,16 @@ def get_data_tag(html_file_path, text_df):
     
 
 def get_data_tags(html_floder, text_file, isTest=False):
-    # 将标签路径信息和相应的标签信息转换为数值表示的数据作为输入数据
     
     tag_path_idx = []
     tag_idx = []
     content_all = []
 
-    # 遍历源文件夹下的所有文件
     with open(text_file, 'r', encoding='utf-8') as file_text:
         lines = file_text.readlines()
 
-    # 创建空的 DataFrame
     df = pd.DataFrame(columns=["Filename", "Body text", "Website"])
 
-    # 解析每一行文本并添加到 DataFrame 中
     for line in lines:
         if line.startswith("{"):
             row = eval(line)
@@ -109,7 +103,7 @@ def get_data_tags(html_floder, text_file, isTest=False):
     for filename in os.listdir(html_floder):
         print(filename)
         if filename.endswith(".html"):
-            # 构造html文件的完整路径
+            # construct html file path
             html_file_path = os.path.join(html_floder, filename)
             
             encoding_list, target, content = get_data_tag(html_file_path, df)
@@ -117,7 +111,7 @@ def get_data_tags(html_floder, text_file, isTest=False):
             tag_path_idx.extend(encoding_list)
             tag_idx.extend(target)
 
-    # 零填充
+    # padding 
     max_length = max(len(path) for path in tag_path_idx)
     tag_path_padded = np.array([path + [[0.]*62] * (max_length - len(path)) for path in tag_path_idx])
     tag_idx = np.array(tag_idx)
@@ -138,7 +132,7 @@ def normalize(x, params_dict):
     text_length = x[:, :, 60]
     punctuation_nb = x[:, :, 61]
 
-    # 最大最小值归一化
+    # normalize by min-max
     label_min = np.min(label_encoding, axis=2)
     label_max = np.max(label_encoding, axis=2)
     normalized_label_encoding = (label_encoding - label_min[:, :, np.newaxis]) / ((label_max[:, :, np.newaxis] - label_min[:, :, np.newaxis])+1e-16)
@@ -149,7 +143,7 @@ def normalize(x, params_dict):
     normalized_attribute_encoding = (attribute_encoding - attribute_min[:, :, np.newaxis]) / ((attribute_max[:, :, np.newaxis] - attribute_min[:, :, np.newaxis])+1e-16)
 
     
-    # Z-score标准化
+    # Z-score normalization
     if params_dict == {}:
         text_length_mean = np.mean(text_length)
         text_length_std = np.std(text_length)
@@ -171,8 +165,7 @@ def normalize(x, params_dict):
     normalized_punctuation_nb = (punctuation_nb - punctuation_nb_mean) / punctuation_nb_std
     normalized_punctuation_nb = normalized_punctuation_nb[:, :, np.newaxis]
 
-    
-    # 将标签编码、属性编码、文本长度和标点符号数量拼接在一起
+    # concatenate label encoding, attribute encoding, text length and punctuation number
     normalized_x = np.concatenate((normalized_label_encoding, normalized_attribute_encoding, normalized_text_length, normalized_punctuation_nb), axis=2)
     return normalized_x         
 
@@ -196,11 +189,10 @@ def load_normalization_params(normalization_params_path):
 
 
 def calculate_f1_score(y_true, y_pred):
-    # 将标签转换为二进制形式
     y_true = np.array(y_true)
     y_pred = np.array(y_pred)
 
-    # 计算 F1 分数
+    # calculate f1 score
     f1 = f1_score(y_true, y_pred)
 
     return f1
@@ -215,7 +207,7 @@ class LSTMModel(nn.Module):
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
-        lstm_out = lstm_out[:, -1, :]  # 取最后一个时间步的输出
+        lstm_out = lstm_out[:, -1, :] 
         output = self.fc(lstm_out)
         return output
 
@@ -225,16 +217,15 @@ class BiLSTMModel(nn.Module):
         super(BiLSTMModel, self).__init__()
         self.hidden_size = hidden_size
         self.lstm = nn.LSTM(input_size, hidden_size, num_layers, dropout=dropout, batch_first=True, bidirectional=True)
-        self.fc = nn.Linear(hidden_size * 2, output_size)  # 注意这里的 hidden_size 乘以 2
+        self.fc = nn.Linear(hidden_size * 2, output_size)  
 
     def forward(self, x):
         lstm_out, _ = self.lstm(x)
-        lstm_out = lstm_out[:, -1, :]  # 取最后一个时间步的输出
+        lstm_out = lstm_out[:, -1, :] 
         output = self.fc(lstm_out)
         return output
 
 
-# 修改 MyDataset 类
 class MyDataset(Dataset):
     def __init__(self, X, y):
         self.X = X
@@ -250,9 +241,9 @@ class MyDataset(Dataset):
 
 
 def load_model(model_file, model):
-    # 加载保存的权重
+    # save model
     model.load_state_dict(torch.load(model_file))
-    # 设置模型为评估模式（如果需要进行推理）
+    
     model.eval()
     return model
     
@@ -266,7 +257,7 @@ def main():
     normalized_X_train = normalize(X_train, params_dict)
 
 
-    # 调用函数保存归一化参数
+
     # save_normalization_params("normalization_params_la.pkl", params_dict['text_length_mean'], # # params_dict['text_length_std'], params_dict['punctuation_nb_mean'], #params_dict['punctuation_nb_std'])
 
     # Set hyperparameters
@@ -287,12 +278,14 @@ def main():
 
     res = []
     Y_train_copy = copy.deepcopy(y_train)
+
+    # train loop
     for fold, (train_idx, val_idx) in enumerate(kfold.split(normalized_X_train, Y_train_copy)):
         print(f'Fold {fold + 1}')
         res_sub = []
         X_train, X_val = normalized_X_train[train_idx], normalized_X_train[val_idx]
         Y_train, Y_val = Y_train_copy[train_idx], Y_train_copy[val_idx]
-        # 创建数据加载器
+        
         if type(X_train) == np.ndarray:
             X_train = torch.from_numpy(X_train).float()
         if type(X_val) == np.ndarray:
@@ -303,26 +296,25 @@ def main():
         val_dataset = MyDataset(X_val, Y_val)
         val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
-        # 训练循环
         best_loss = float('inf')
         best_f1 = 0
         no_improvement_count = 0
 
-        # 创建模型实例
+        # model = BiLSTMModel(input_size, hidden_size, num_layers, output_size, dropout)
         model = LSTMModel(input_size, hidden_size, num_layers, output_size, dropout)
-        # 计算类别权重
+
+        # balance the dataset by assigning weights to each class
         num_positive = sum(Y_train)
         num_negative = len(Y_train) - num_positive
 
-        # 计算权重
+        # calculate weights
         positive_weight = num_negative / (num_positive + num_negative)
         negative_weight = num_positive / (num_positive + num_negative)
 
         class_weights = torch.tensor([negative_weight, positive_weight])
-        # 定义损失函数并传递权重
         criterion = nn.BCEWithLogitsLoss(pos_weight=class_weights[1])
 
-        #优化器
+        # define optimizer
         optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate)
 
         for epoch in range(num_epochs):
@@ -362,7 +354,7 @@ def main():
             res_sub.append([avg_train_loss, avg_val_loss, val_f1])
             print(f'Epoch [{epoch+1}/{num_epochs}] Train Loss: {avg_train_loss:.4f} Val Loss: {avg_val_loss:.4f} Val F1: {val_f1:.4f}')
 
-            # 判断是否早停
+            # early stopping
             if avg_val_loss < best_loss or val_f1 > best_f1:
                 best_loss = avg_val_loss
                 best_f1 = val_f1

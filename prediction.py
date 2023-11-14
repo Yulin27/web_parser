@@ -150,7 +150,7 @@ def prediction(file_html,filename, normalization_params, model):
 
 
 def main(argv):
-    model_type = "zh"  # 默认为"zh"模型
+    model_type = "zh"  # default model type
     try:
         opts, args = getopt.getopt(argv, "hi:o:m:", ["ifile=", "ofile=", "model="])
     except getopt.GetoptError:
